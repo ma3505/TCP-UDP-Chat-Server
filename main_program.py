@@ -3,6 +3,7 @@
 from threading import Thread
 import socket
 
+
 def get_server_ip_and_port():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.connect(("8.8.8.8", 80))
@@ -42,6 +43,7 @@ def handle_client_connection(client):
             del CLIENTS[client]
             send_all("<<<LEFT>>>:%s" % name, name)
             break
+
 
 def send_all(msg, name):
     for client_socket in CLIENTS:
