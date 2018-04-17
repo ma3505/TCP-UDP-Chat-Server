@@ -50,10 +50,16 @@ def send_all(msg, name):
         client_socket.send("<<<FROM>>>:%s <<<|||>>> %s" % name, msg)
 
 
+# Function To Handle the Delimiter using Regex
+def GetTheSentences(encoded_msg):
+    result = re.findall('<<<(.*?)>>>',encoded_msg)
+    return result
+
+
 def handle_incoming_connections(server):
     while True:
         client_socket, client_address = server.accept()
-        print("New connection from %s" % client_address)
+        print("New connection from %s" % str(client_address))
         client_socket.send("<<<CONNECTED>>>")
         Thread(target=handle_client_connection, args=(client_socket,)).start()
 
