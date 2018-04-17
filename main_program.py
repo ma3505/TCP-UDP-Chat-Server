@@ -2,6 +2,7 @@
 
 from threading import Thread
 import socket
+import re
 
 
 def get_server_ip_and_port():
@@ -30,7 +31,8 @@ def initiate_tcp_server(server):
 
 def handle_client_connection(client):
     name = client.recv(BUFFER_SIZE).decode("utf8")
-    send_all("<<<NEW>>>:%s" % name, name)
+    msg = "CONNECTED"
+    send_all("<<<NEW>>>:%s" % name, msg)
     CLIENTS[client] = name
 
     while True:
@@ -45,15 +47,11 @@ def handle_client_connection(client):
             break
 
 
-def send_all(msg, name):
+def send_all(msg,name):
     for client_socket in CLIENTS:
-        client_socket.send("<<<FROM>>>:%s <<<|||>>> %s" % name, msg)
 
+        client_socket.send(str(name+msg))
 
-# Function To Handle the Delimiter using Regex
-def GetTheSentences(encoded_msg):
-    result = re.findall('<<<(.*?)>>>',encoded_msg)
-    return result
 
 
 def handle_incoming_connections(server):
@@ -62,6 +60,11 @@ def handle_incoming_connections(server):
         print("New connection from %s" % str(client_address))
         client_socket.send("<<<CONNECTED>>>")
         Thread(target=handle_client_connection, args=(client_socket,)).start()
+
+# Function To Handle the Delimiter using Regex
+def set_encoding(encoded_msg):
+    result = re.findall('<<<(.*?)>>>',encoded_msg)
+    return result
 
 
 CLIENTS = {}
