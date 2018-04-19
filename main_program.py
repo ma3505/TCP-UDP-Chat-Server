@@ -1,6 +1,7 @@
 """main program to initiate the servers that we care about """
 
 from threading import Thread
+
 import socket
 import re
 
@@ -30,27 +31,33 @@ def initiate_tcp_server(server):
 
 
 def handle_client_connection(client):
-    name = client.recv(BUFFER_SIZE).decode("utf8")
-    msg = "CONNECTED"
-    send_all("<<<NEW>>>:%s" % name, msg)
+    # De_encodes names to be used as a variable
+    name = str(de_encode(client.recv(BUFFER_SIZE).decode("utf8"))[1])
+    msg = set_encoding("NEW_USER",name + " connected" )
+    send_all(msg)
+
     CLIENTS[client] = name
+    try:
+        while True:
+            msg = client.recv(BUFFER_SIZE)
+            if msg != "<<<EXIT>>>":
+                #  attach new_message encoding with user message
+                user_msg = set_encoding("NEW_MESSAGE",str(name)+": "+str(msg))
+                send_all(user_msg)
+            else:
+                client.send("<<<EXITED>>>")
+                client.close()
+                del CLIENTS[client]
+                left_msg = set_encoding("LEFT",name)
+                send_all(left_msg)
+                break
+    except socket.error:
+        print("Client Disconnected")
 
-    while True:
-        msg = client.recv(BUFFER_SIZE)
-        if msg != "<<<EXIT>>>":
-            send_all(msg, name)
-        else:
-            client.send("<<<EXITED>>>")
-            client.close()
-            del CLIENTS[client]
-            send_all("<<<LEFT>>>:%s" % name, name)
-            break
 
-
-def send_all(msg,name):
+def send_all(msg):
     for client_socket in CLIENTS:
-
-        client_socket.send(str(name+msg))
+        client_socket.send(str(msg))
 
 
 
@@ -62,9 +69,19 @@ def handle_incoming_connections(server):
         Thread(target=handle_client_connection, args=(client_socket,)).start()
 
 # Function To Handle the Delimiter using Regex
-def set_encoding(encoded_msg):
+def de_encode(encoded_msg):
     result = re.findall('<<<(.*?)>>>',encoded_msg)
     return result
+
+
+# Used for encoding messages sent to the client
+# Identifiers are used to communicate messages, userlists, and events
+# between the backend and front-end
+def set_encoding(key_identifer,encoded_msg):
+    result = "<<<" + key_identifer + ">>>" + "<<<" + encoded_msg + ">>>"
+    return result
+
+
 
 
 CLIENTS = {}
