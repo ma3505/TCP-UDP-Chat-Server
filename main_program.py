@@ -55,7 +55,7 @@ def initiate_udp_server(server):
 def handle_incoming_udp_message(server):
     while True:
         client_data, client_address = server.recvfrom(BUFFER_SIZE)
-        Thread(target=handle_udp_message_received, args=(client_data, client_address,)).start()
+        Thread(target=handle_udp_message_received, args=(server, client_data, client_address,)).start()
 
 
 def handle_udp_message_received(server, client_data, client_address):
