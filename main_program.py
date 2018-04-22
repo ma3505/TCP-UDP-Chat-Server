@@ -41,16 +41,28 @@ def initiate_udp_server(server):
     host, port = get_server_ip_and_port()
     addr = (host, port)
     server.bind(addr)
-    server.listen(10)
     addr, port = server.getsockname()
     print("New UDP server initialized on %s:%s" % (addr, port))
 
     try:
-        Thread(target=handle_incoming_connections, args=(server,)).start()
+        Thread(target=handle_incoming_udp_message, args=(server,)).start()
     except RuntimeError:
         print("UDP server couldn't spawn new connection handling thread")
         server.close()
         server = None
+
+
+def handle_incoming_udp_message(server):
+    while True:
+        client_data, client_address = server.recvfrom(BUFFER_SIZE)
+        Thread(target=handle_udp_message_received, args=(client_data, client_address,)).start()
+
+
+def handle_udp_message_received(server, client_data, client_address):
+    client_port = client_data[:5]
+    print("New message from %s:%s" % client_address, client_port)
+    print("client data: %s" % client_data)
+    LISTENERS[client_port] = client_address
 
 
 # This method will loop endlessly while it awaits clients to connect to its socket. When it does register the client
@@ -71,6 +83,8 @@ def handle_client_connection(client):
     send_all(msg)
 
     CLIENTS[client] = name
+    LISTENERS[client.getsockname[1]] = client.getsockname[0]
+
     try:
         while True:
             msg = client.recv(BUFFER_SIZE)
@@ -82,6 +96,8 @@ def handle_client_connection(client):
                 client.send("<<<EXITED>>>")
                 client.close()
                 del CLIENTS[client]
+                del LISTENERS[client.getsockname[1]]
+
                 left_msg = set_encoding("LEFT", name)
                 send_all(left_msg)
                 break
@@ -90,9 +106,13 @@ def handle_client_connection(client):
 
 
 # This function is responsible for sending all clients regardless of their protocol the new message.
-def send_all(msg):
+def send_all(msg, server):
     for client_socket in CLIENTS:
         client_socket.send(str(msg))
+
+    if (server):
+        for listener in LISTENERS:
+            server.sendto(msg, listener)
 
 
 # Function To Handle the Delimiter using Regex
@@ -110,6 +130,7 @@ def set_encoding(key_identifer, encoded_msg):
 
 
 CLIENTS = {}
+LISTENERS = {}
 TCP_SERVER = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 UDP_SERVER = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 BUFFER_SIZE = 1024
@@ -123,10 +144,12 @@ if __name__ == "__main__":
         TCP_SERVER.close()
         TCP_SERVER = None
 
-    try:
-        initiate_udp_server(UDP_SERVER)
-    except IOError:
-        print("UDP Server encountered an IOError")
-        UDP_SERVER.close()
-        UDP_SERVER = None
+    initiate_udp_server(UDP_SERVER)
+
+    # try:
+    #     initiate_udp_server(UDP_SERVER)
+    # except IOError:
+    #     print("UDP Server encountered an IOError")
+    #     UDP_SERVER.close()
+    #     UDP_SERVER = None
 
