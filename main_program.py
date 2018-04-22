@@ -26,6 +26,24 @@ def initiate_tcp_server(server):
     try:
         Thread(target=handle_incoming_connections, args=(server,)).start()
     except RuntimeError:
+        print("TCP server couldn't spawn new connection handling thread")
+        server.close()
+        server = None
+
+
+def initiate_udp_server(server):
+    print("Initiating UDP Server...")
+    host, port = get_server_ip_and_port()
+    addr = (host, port)
+    server.bind(addr)
+    server.listen(10)
+    addr, port = server.getsockname()
+    print("New UDP server initialized on %s:%s" % (addr, port))
+
+    try:
+        Thread(target=handle_incoming_connections, args=(server,)).start()
+    except RuntimeError:
+        print("UDP server couldn't spawn new connection handling thread")
         server.close()
         server = None
 
@@ -86,6 +104,7 @@ def set_encoding(key_identifer,encoded_msg):
 
 CLIENTS = {}
 TCP_SERVER = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+UDP_SERVER = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 BUFFER_SIZE = 1024
 
 
@@ -93,5 +112,14 @@ if __name__ == "__main__":
     try:
         initiate_tcp_server(TCP_SERVER)
     except IOError:
+        print("TCP Server encountered an IOError")
         TCP_SERVER.close()
         TCP_SERVER = None
+
+    try:
+        initiate_udp_server(UDP_SERVER)
+    except IOError:
+        print("UDP Server encountered an IOError")
+        UDP_SERVER.close()
+        UDP_SERVER = None
+
