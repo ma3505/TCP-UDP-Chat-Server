@@ -72,7 +72,6 @@ def handle_udp_message_received(server):
 
             if '<<<EXIT>>>' not in msg:
                 user_msg = str(name)+": " + str(newMsg)
-                print('Sending all clients %s via UDP', user_msg)
                 send_all(user_msg)
             else:
                 server.sendto('<<<EXITED>>>', (addr, port))
@@ -116,10 +115,12 @@ def handle_client_connection(client, name):
             halfWayNewMsg = msg[first_bracket_index + 10:]
             newMsg = halfWayNewMsg[:-3]
 
+            if len(newMsg) is 0:
+                newMsg = 'Hi! I just joined! - Lets chat :)'
+
             if '<<<EXIT>>>' not in msg:
                 # attach new_message encoding with user message
                 user_msg = str(name) + ": " + str(newMsg)
-                print('Sending all clients %s via TCP', (user_msg))
                 send_all(user_msg)
             else:
                 client.send("<<<EXITED>>>")
@@ -135,11 +136,19 @@ def handle_client_connection(client, name):
 
 # This function is responsible for sending all clients regardless of their protocol the new message.
 def send_all(msg):
-    for client_socket in CLIENTS:
-        client_socket.send(str(msg))
+    if (len(CLIENTS) > 0):
+        print('Sending all TCP clients %s ' % msg)
 
-    for port in LISTENERS:
-        UDP_SERVER.sendto(msg, LISTENERS[port])
+        for client_socket in CLIENTS:
+            print('Sending to %s:%s via TCP' % client_socket.getsockname())
+            client_socket.send(str(msg))
+
+    if (len(LISTENERS) >0):
+        print('Sending all UDP clients %s ' % msg)
+
+        for port in LISTENERS:
+            print('Sending to %s:%s via UDP' % (LISTENERS[port][0], port))
+            UDP_SERVER.sendto(str(msg), LISTENERS[port])
 
 
 # Function To Handle the Delimiter using Regex
