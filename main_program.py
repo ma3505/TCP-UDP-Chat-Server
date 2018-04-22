@@ -59,14 +59,20 @@ def handle_udp_message_received(server):
             addr, port = client_address
 
             print("New UDP message from %s:%s" % (addr, port))
-            LISTENERS[port] = addr
+            LISTENERS[port] = client_address
 
-            first_bracket_index = msg[11:].find('>')
-            name = msg[11:first_bracket_index]
-            newMsg = msg[:first_bracket_index+2]
-            if '<<<EXIT>>>' not in newMsg:
-                decoded_msg = de_encode(msg)
-                user_msg = set_encoding("NEW_MESSAGE", str(name) + ": " + str(decoded_msg))
+            first_bracket_index = msg.find('>')
+            user_portion = msg[12:]
+            name = user_portion[:+first_bracket_index - 12]
+            halfWayNewMsg = msg[first_bracket_index + 10:]
+            newMsg = halfWayNewMsg[:-3]
+
+            if len(newMsg) is 0:
+                newMsg = 'Hi! I just joined! - Lets chat :)'
+
+            if '<<<EXIT>>>' not in msg:
+                user_msg = str(name)+": " + str(newMsg)
+                print('Sending all clients %s via UDP', user_msg)
                 send_all(user_msg)
             else:
                 server.sendto('<<<EXITED>>>', (addr, port))
@@ -88,7 +94,7 @@ def handle_incoming_connections(server):
         client_socket.send("<<<CONNECTED>>>")
 
         # De_encodes names to be used as a variable
-        name = str(de_encode(client_socket.recv(BUFFER_SIZE).decode("utf8"))[1])
+        name = str(de_encode(client_socket.recv(BUFFER_SIZE).decode("utf8")))
         msg = set_encoding("NEW_USER", name + " connected")
         send_all(msg)
 
@@ -98,20 +104,27 @@ def handle_incoming_connections(server):
 # This function is used
 def handle_client_connection(client, name):
     CLIENTS[client] = name
-    LISTENERS[client.getsockname[1]] = client.getsockname[0]
+    LISTENERS[client.getsockname()[1]] = (client.getsockname())
 
     try:
         while True:
             msg = client.recv(BUFFER_SIZE)
+
+            first_bracket_index = msg.find('>')
+            user_portion = msg[12:]
+            name = user_portion[:+first_bracket_index - 12]
+            halfWayNewMsg = msg[first_bracket_index + 10:]
+            newMsg = halfWayNewMsg[:-3]
+
             if '<<<EXIT>>>' not in msg:
                 # attach new_message encoding with user message
-                user_msg = set_encoding("NEW_MESSAGE", str(name)+": "+str(de_encode(msg)[1]))
+                user_msg = str(name) + ": " + str(newMsg)
+                print('Sending all clients %s via TCP', (user_msg))
                 send_all(user_msg)
             else:
                 client.send("<<<EXITED>>>")
                 client.close()
                 del CLIENTS[client]
-                del LISTENERS[client.getsockname[1]]
 
                 left_msg = set_encoding("LEFT", name)
                 send_all(left_msg)
@@ -125,8 +138,8 @@ def send_all(msg):
     for client_socket in CLIENTS:
         client_socket.send(str(msg))
 
-    for port, address in LISTENERS:
-        UDP_SERVER.sendto(msg, (address, port))
+    for port in LISTENERS:
+        UDP_SERVER.sendto(msg, LISTENERS[port])
 
 
 # Function To Handle the Delimiter using Regex
