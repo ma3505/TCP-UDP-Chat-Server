@@ -6,10 +6,6 @@ import socket
 import re
 
 
-TCP_SERVER = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-UDP_SERVER = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-
 # Dynamically get a unique port and server IP.
 def get_server_ip_and_port():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -176,12 +172,8 @@ def set_encoding(key_identifer, encoded_msg):
     return result
 
 
-CLIENTS = {}
-LISTENERS = {}
-BUFFER_SIZE = 1024
-
-
-if __name__ == "__main__":
+def main(TCP_SERVER, UDP_SERVER):
+    print("To close out of this server press Control + Z\n")
     try:
         initiate_tcp_server()
     except IOError:
@@ -195,3 +187,13 @@ if __name__ == "__main__":
         print("UDP Server encountered an IOError")
         UDP_SERVER.close()
         UDP_SERVER = None
+
+TCP_SERVER = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+UDP_SERVER = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+CLIENTS = {}
+LISTENERS = {}
+BUFFER_SIZE = 1024
+
+
+if __name__ == "__main__":
+    main(TCP_SERVER, UDP_SERVER)
