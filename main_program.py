@@ -6,6 +6,10 @@ import socket
 import re
 
 
+TCP_SERVER = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+UDP_SERVER = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+
 # Dynamically get a unique port and server IP.
 def get_server_ip_and_port():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -31,7 +35,6 @@ def initiate_tcp_server():
     except RuntimeError:
         print("TCP server couldn't spawn new connection handling thread")
         TCP_SERVER.close()
-        server = None
 
 
 # This method kicks off the UDP server used to handle tcp messages coming from clients.
@@ -49,9 +52,9 @@ def initiate_udp_server():
     except RuntimeError:
         print("UDP server couldn't spawn new connection handling thread")
         UDP_SERVER.close()
-        server = None
 
 
+# This method is used to receive messages on UDP sockets and send it to all users.
 def handle_udp_message_received(server):
     try:
         while True:
@@ -59,7 +62,13 @@ def handle_udp_message_received(server):
             addr, port = client_address
 
             print("New UDP message from %s:%s" % (addr, port))
-            LISTENERS[port] = client_address
+
+            newUdpClient = False
+
+            if port not in LISTENERS:
+                UDP_SERVER.sendto("<<<CONNECTED via UDP>>>", (addr, port))
+                LISTENERS[port] = client_address
+                newUdpClient = True
 
             first_bracket_index = msg.find('>')
             user_portion = msg[12:]
@@ -67,11 +76,12 @@ def handle_udp_message_received(server):
             halfWayNewMsg = msg[first_bracket_index + 10:]
             newMsg = halfWayNewMsg[:-3]
 
-            if len(newMsg) is 0:
-                newMsg = 'Hi! I just joined! - Lets chat :)'
-
             if '<<<EXIT>>>' not in msg:
-                user_msg = str(name)+": " + str(newMsg)
+
+                if newUdpClient:
+                    newMsg = "Connected"
+
+                user_msg = str(name)+"(UDP): " + str(newMsg)
                 send_all(user_msg)
             else:
                 server.sendto('<<<EXITED>>>', (addr, port))
@@ -90,20 +100,24 @@ def handle_incoming_connections(server):
     while True:
         client_socket, client_address = server.accept()
         print("New TCP connection from %s" % str(client_address))
-        client_socket.send("<<<CONNECTED>>>")
+        client_socket.send("<<<CONNECTED via TCP>>>")
 
         # De_encodes names to be used as a variable
-        name = str(de_encode(client_socket.recv(BUFFER_SIZE).decode("utf8")))
-        msg = set_encoding("NEW_USER", name + " connected")
+        msg = client_socket.recv(BUFFER_SIZE);
+
+        first_bracket_index = msg.find('>')
+        user_portion = msg[12:]
+        name = user_portion[:+first_bracket_index - 12]
+        msg = name + "(TCP): Connected"
         send_all(msg)
 
         Thread(target=handle_client_connection, args=(client_socket, name)).start()
 
 
-# This function is used
+# This function is used to handle TCP client messages and send it to all connected users.
 def handle_client_connection(client, name):
-    CLIENTS[client] = name
-    LISTENERS[client.getsockname()[1]] = (client.getsockname())
+    client_name = name
+    CLIENTS[client_name] = client
 
     try:
         while True:
@@ -115,37 +129,34 @@ def handle_client_connection(client, name):
             halfWayNewMsg = msg[first_bracket_index + 10:]
             newMsg = halfWayNewMsg[:-3]
 
-            if len(newMsg) is 0:
-                newMsg = 'Hi! I just joined! - Lets chat :)'
-
             if '<<<EXIT>>>' not in msg:
                 # attach new_message encoding with user message
-                user_msg = str(name) + ": " + str(newMsg)
+                user_msg = str(name) + "(TCP): " + str(newMsg)
                 send_all(user_msg)
             else:
                 client.send("<<<EXITED>>>")
                 client.close()
-                del CLIENTS[client]
+                del CLIENTS[name]
 
                 left_msg = set_encoding("LEFT", name)
                 send_all(left_msg)
                 break
     except socket.error:
-        print("Client Disconnected via error")
+        del CLIENTS[client_name]
+        send_all(client_name + " disconnected")
+        print("Client Disconnected")
 
 
 # This function is responsible for sending all clients regardless of their protocol the new message.
 def send_all(msg):
     if (len(CLIENTS) > 0):
         print('Sending all TCP clients %s ' % msg)
-
-        for client_socket in CLIENTS:
-            print('Sending to %s:%s via TCP' % client_socket.getsockname())
-            client_socket.send(str(msg))
+        for name in CLIENTS:
+            print('Sending to %s:%s via TCP' % (CLIENTS[name].getpeername()));
+            CLIENTS[name].send(str(msg))
 
     if (len(LISTENERS) >0):
         print('Sending all UDP clients %s ' % msg)
-
         for port in LISTENERS:
             print('Sending to %s:%s via UDP' % (LISTENERS[port][0], port))
             UDP_SERVER.sendto(str(msg), LISTENERS[port])
@@ -167,8 +178,6 @@ def set_encoding(key_identifer, encoded_msg):
 
 CLIENTS = {}
 LISTENERS = {}
-TCP_SERVER = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-UDP_SERVER = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 BUFFER_SIZE = 1024
 
 
@@ -186,4 +195,3 @@ if __name__ == "__main__":
         print("UDP Server encountered an IOError")
         UDP_SERVER.close()
         UDP_SERVER = None
-
